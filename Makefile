@@ -10,13 +10,14 @@ GOFMT=gofmt -l=true -tabwidth=4 -comments=true -w
 CC=cc
 CFLAGS += $(shell pkg-config --libs x11)
 
-tinywm:
 
+#tinywm:
 include $(GOROOT)/src/Make.cmd
 
 
+
 test: clean all
-	./test
+	./gowm
 
 format:
 	${GOFMT} .
