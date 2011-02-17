@@ -1,4 +1,3 @@
 #!/bin/sh
-Xnest :10&
-DISPLAY=:0.0 ./gowm&
-DISPLAY=:10 dwm
+#Xnest :10&
+startx

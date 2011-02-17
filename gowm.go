@@ -1,82 +1,134 @@
 package main
 
 import (
-	"fmt"
 	"os"
+	"log"
 	"x-go-binding.googlecode.com/hg/xgb"
 )
 
+var (
+	bcolor     = "turquoise"
+	conn       *xgb.Conn
+	screen     *xgb.ScreenInfo
+	root       xgb.Id
+	logger     = log.New(os.Stderr, "", log.Ldate|log.Ltime)
+	envdisplay = os.Getenv("DISPLAY")
+)
+
+
 func main() {
-	log("main")
-	c := connectX()
-	screen := c.DefaultScreen()
-	c.ChangeWindowAttributes(screen.Root, xgb.CWEventMask, []uint32{xgb.EventMaskSubstructureNotify|xgb.EventMaskEnterWindow})
-	win := createwin(c)
-	setupwin(win, c)
-	c.MapWindow(win)
-	qtr, _ := c.QueryTree(screen.Root)
-	log(fmt.Sprintf("our win %s ", win))
-	for _, value := range qtr.Children {
-		log(fmt.Sprintf("%s ", value))
+	lprintf("starting")
+	bcolor = "red"
+	connectToX()
+	screen = conn.DefaultScreen()
+	root = screen.Root
+	registerEvents()
+	checkWM()
+	setupScreen()
+	run()
+	shutdown()
+}
+
+func setupScreen() {
+	qtr, err := conn.QueryTree(root)
+	atom_desktop, _ := conn.InternAtom(true, "_NET_WM_DESKTOP")
+	if err != nil {
+		lfatalf(err.String())
 	}
-	run(c)
-	c.Close()
+	for _, child := range qtr.Children {
+		lprintf("found window %v", child)
+		attr, err := conn.GetWindowAttributes(child)
+		if err != nil {
+			lprintf("couldnt get attribute for %v", child)
+			continue
+		}
+		if !attr.OverrideRedirect || attr.MapState == xgb.MapStateViewable {
+			conn.ChangeProperty(xgb.PropModeReplace, child, atom_desktop.Atom, xgb.AtomString, 8, []uint8{0})
+		}
+
+	}
+}
+
+func getWmDestop() {
+}
+
+func connectToX() {
+	var e os.Error
+	lprintf("connect to %v", envdisplay)
+	conn, e = xgb.Dial(envdisplay)
+	if e != nil {
+		lfatalf("connecting to %v", envdisplay)
+	}
+	lprintf("connected to %v", envdisplay)
+}
+
+func setupscreen() {
+}
+
+
+func rootFlags() []uint32 {
+	return []uint32{
+		xgb.EventMaskSubstructureRedirect |
+			xgb.EventMaskSubstructureNotify |
+			xgb.EventMaskStructureNotify |
+			xgb.EventMaskLeaveWindow |
+			xgb.EventMaskEnterWindow |
+			xgb.EventMaskPropertyChange,
+	}
+}
+
+func dRootFlags() []uint32 {
+	return []uint32{
+		xgb.EventMaskSubstructureRedirect |
+			xgb.EventMaskSubstructureNotify |
+			xgb.EventMaskStructureNotify |
+			xgb.EventMaskLeaveWindow |
+			xgb.EventMaskEnterWindow |
+			xgb.EventMaskPropertyChange,
+	}
+}
+
+
+func registerEvents() {
+	conn.ChangeWindowAttributes(root, xgb.CWEventMask, dRootFlags())
+
+}
+
+func checkWM() {
+	_, err := conn.WaitForEvent()
+	if err != nil {
+		lfatalf("Is a another window manager running?")
+	}
+}
+
+
+func shutdown() {
+	lprintf("closing %v", envdisplay)
+	conn.Close()
 	os.Exit(0)
 }
 
-
-func run(con *xgb.Conn) {
+func run() {
+	conn.MapWindow(root)
 	for {
-		reply, err := con.WaitForEvent()
-		log(fmt.Sprintf("%T", reply))
+		reply, err := conn.WaitForEvent()
 		if err != nil {
-			log(fmt.Sprintf("error %v", err))
-			os.Exit(1)
+			lfatalf("error : %v", err)
 		}
+		lprintf("event %T", reply)
 		switch event := reply.(type) {
 		case xgb.ExposeEvent:
-		case xgb.ConfigureNotifyEvent:
-			nc, _ := con.AllocNamedColor(con.DefaultScreen().DefaultColormap, "turquoise")
-			con.ChangeWindowAttributes(event.Window, xgb.CWBorderPixel, []uint32{nc.Pixel})
-			//setupwin(event.Window, con)
+		case xgb.MapRequestEvent:
+			lprintf("%T from %v", reply, event.Window)
+			conn.MapWindow(event.Window)
 		}
 	}
 }
 
-func createwin(con *xgb.Conn) xgb.Id {
-	log("create win")
-	win := con.NewId()
-	gc := con.NewId()
-	s := con.DefaultScreen()
-	con.CreateWindow(0, win, s.Root, 1200, 150, 200, 200, xgb.WindowClassInputOutput, 0, 0, 0, nil)
-	con.ChangeWindowAttributes(win, xgb.CWBackPixel|xgb.CWEventMask,
-		[]uint32{
-			s.BlackPixel,
-			xgb.EventMaskExposure | xgb.EventMaskKeyRelease | xgb.EventMaskKeyPress | xgb.EventMaskEnterWindow,
-		})
-	con.CreateGC(gc, win, xgb.GCForeground, []uint32{s.WhitePixel})
-	return win
+func lprintf(format string, i ...interface{}) {
+	logger.Printf("gowm: "+format, i...)
 }
 
-
-func setupwin(win xgb.Id, con *xgb.Conn) {
-	log("setupwin")
-	nc, _ := con.AllocNamedColor(con.DefaultScreen().DefaultColormap, "turquoise")
-	con.ChangeWindowAttributes(win, xgb.CWBorderPixel, []uint32{nc.Pixel})
-}
-
-func connectX() *xgb.Conn {
-	log("connect")
-	log("connecting to " + os.Getenv("DISPLAY"))
-	c, err := xgb.Dial(os.Getenv("DISPLAY"))
-	if err != nil {
-		fmt.Printf("cannot connect: %v\n", err)
-		os.Exit(1)
-	}
-	log("connected to " + os.Getenv("DISPLAY"))
-	return c
-}
-
-func log(msg string) {
-	println("gowm: " + msg)
+func lfatalf(format string, i ...interface{}) {
+	logger.Fatalf("gowm: error: "+format, i...)
 }

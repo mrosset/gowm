@@ -7,17 +7,16 @@ include $(GOROOT)/src/Make.inc
 TARG=gowm
 GOFILES=gowm.go
 GOFMT=gofmt -l=true -tabwidth=4 -comments=true -w
-CC=cc
+CC=clang
 CFLAGS += $(shell pkg-config --libs x11)
+DIRS=test
 
 
-#tinywm:
 include $(GOROOT)/src/Make.cmd
 
-
-
-test: clean all
-	./gowm
+test: format clean xcb all
+	./test
 
 format:
 	${GOFMT} .
+
