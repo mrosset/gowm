@@ -1,3 +1,9 @@
 #!/bin/sh
-#Xnest :10&
-startx
+Xephyr :12 -screen 1024x768 2> /dev/null&
+DISPLAY=:12 
+sleep 1
+xsetroot -cursor_name left_ptr
+xsetroot -bg "#121212" -mod 3 3
+urxvt&
+#urxvt&
+./gowm

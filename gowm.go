@@ -23,28 +23,49 @@ func main() {
 	screen = conn.DefaultScreen()
 	root = screen.Root
 	registerEvents()
+	createTestWindow()
 	checkWM()
 	setupScreen()
 	run()
 	shutdown()
 }
 
+func createTestWindow() {
+	win := conn.NewId()
+	gc := conn.NewId()
+	conn.CreateWindow(0, win, root, 150, 150, 200, 200, 0, 0, 0, 0, nil)
+	conn.ChangeWindowAttributes(win, xgb.CWBackPixel|xgb.CWEventMask,
+		[]uint32{
+			screen.WhitePixel,
+			xgb.EventMaskExposure | xgb.EventMaskKeyRelease | xgb.EventMaskEnterWindow,
+		})
+	conn.CreateGC(gc, win, xgb.GCForeground, []uint32{screen.WhitePixel})
+	conn.MapWindow(win)
+	setupWindow(win)
+}
+
 func setupScreen() {
 	qtr, err := conn.QueryTree(root)
-	atom_desktop, _ := conn.InternAtom(true, "_NET_WM_DESKTOP")
+	//atom_desktop, _ := conn.InternAtom(true, "_NET_WM_DESKTOP")
 	if err != nil {
 		lfatalf(err.String())
 	}
 	for _, child := range qtr.Children {
 		lprintf("found window %v", child)
-		attr, err := conn.GetWindowAttributes(child)
-		if err != nil {
-			lprintf("couldnt get attribute for %v", child)
-			continue
-		}
-		if !attr.OverrideRedirect || attr.MapState == xgb.MapStateViewable {
-			conn.ChangeProperty(xgb.PropModeReplace, child, atom_desktop.Atom, xgb.AtomString, 8, []uint8{0})
-		}
+		setupWindow(child)
+	}
+}
+
+func setupWindow(win xgb.Id) {
+	attr, err := conn.GetWindowAttributes(win)
+	if err != nil {
+		lprintf("couldnt get attribute for %v", win)
+		return
+	}
+	if !attr.OverrideRedirect || attr.MapState == xgb.MapStateViewable {
+		setBorderColor(win, "pink")
+		setBorderWidth(win, 2)
+		conn.MapWindow(win)
 
 	}
 }
@@ -53,44 +74,26 @@ func getWmDestop() {
 }
 
 func connectToX() {
-	var e os.Error
-	lprintf("connect to %v", envdisplay)
-	conn, e = xgb.Dial(envdisplay)
-	if e != nil {
-		lfatalf("connecting to %v", envdisplay)
+	lprintf("connecting to %v", envdisplay)
+	var err os.Error
+	conn, err = xgb.Dial(envdisplay)
+	if err != nil {
+		lfatalf("%v", err)
 	}
 	lprintf("connected to %v", envdisplay)
 }
 
-func setupscreen() {
-}
-
-
-func rootFlags() []uint32 {
-	return []uint32{
-		xgb.EventMaskSubstructureRedirect |
-			xgb.EventMaskSubstructureNotify |
-			xgb.EventMaskStructureNotify |
-			xgb.EventMaskLeaveWindow |
-			xgb.EventMaskEnterWindow |
-			xgb.EventMaskPropertyChange,
-	}
-}
-
-func dRootFlags() []uint32 {
-	return []uint32{
-		xgb.EventMaskSubstructureRedirect |
-			xgb.EventMaskSubstructureNotify |
-			xgb.EventMaskStructureNotify |
-			xgb.EventMaskLeaveWindow |
-			xgb.EventMaskEnterWindow |
-			xgb.EventMaskPropertyChange,
-	}
-}
-
 
 func registerEvents() {
-	conn.ChangeWindowAttributes(root, xgb.CWEventMask, dRootFlags())
+	conn.ChangeWindowAttributes(root, xgb.CWEventMask, []uint32{
+		xgb.EventMaskSubstructureRedirect |
+			xgb.EventMaskSubstructureNotify |
+			xgb.EventMaskStructureNotify |
+			xgb.EventMaskLeaveWindow |
+			xgb.EventMaskEnterWindow |
+			xgb.EventMaskPropertyChange |
+			xgb.EventMaskKeyPress,
+	})
 
 }
 
@@ -108,6 +111,10 @@ func shutdown() {
 	os.Exit(0)
 }
 
+func setupwin(win *xgb.Id) {
+	//cond.ConfigureWindow(win, xdb.ConfigureWindow:
+}
+
 func run() {
 	conn.MapWindow(root)
 	for {
@@ -117,12 +124,29 @@ func run() {
 		}
 		lprintf("event %T", reply)
 		switch event := reply.(type) {
+		case xgb.CreateNotifyEvent:
+			lprintf("create event for %v", event.Window)
+			setupWindow(event.Window)
 		case xgb.ExposeEvent:
+		case xgb.EnterNotifyEvent:
+			lprintf("root window is %v", root)
+			lprintf("setting focus to %v", event.Event)
+			conn.SetInputFocus(byte(0), event.Event, event.Time)
 		case xgb.MapRequestEvent:
 			lprintf("%T from %v", reply, event.Window)
-			conn.MapWindow(event.Window)
+			setupWindow(event.Window)
 		}
 	}
+}
+
+func setBorderWidth(win xgb.Id, width uint32) {
+	lprintf("setting %v border width to %v", win, width)
+	conn.ConfigureWindow(win, 16, []uint32{width})
+}
+
+func setBorderColor(win xgb.Id, color string) {
+	lprintf("setting %v border color to %v", win, color)
+	conn.ChangeWindowAttributes(win, xgb.CWBorderPixel|xgb.CWEventMask, []uint32{getColorByName(color), xgb.EventMaskEnterWindow})
 }
 
 func lprintf(format string, i ...interface{}) {
@@ -131,4 +155,9 @@ func lprintf(format string, i ...interface{}) {
 
 func lfatalf(format string, i ...interface{}) {
 	logger.Fatalf("gowm: error: "+format, i...)
+}
+
+func getColorByName(color string) uint32 {
+	cr, _ := conn.AllocNamedColor(screen.DefaultColormap, color)
+	return cr.Pixel
 }

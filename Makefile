@@ -7,10 +7,8 @@ include $(GOROOT)/src/Make.inc
 TARG=gowm
 GOFILES=gowm.go
 GOFMT=gofmt -l=true -tabwidth=4 -comments=true -w
-CC=clang
+CC=cc
 CFLAGS += $(shell pkg-config --libs x11)
-DIRS=test
-
 
 include $(GOROOT)/src/Make.cmd
 

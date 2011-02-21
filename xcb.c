@@ -6,6 +6,7 @@
  
 int main ()
 {
+    puts("nope");
   xcb_connection_t    *c;
   xcb_screen_t        *screen;
   xcb_drawable_t       win;
