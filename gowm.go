@@ -18,7 +18,6 @@ var (
 
 func main() {
 	lprintf("starting")
-	bcolor = "red"
 	connectToX()
 	screen = conn.DefaultScreen()
 	root = screen.Root
@@ -63,8 +62,8 @@ func setupWindow(win xgb.Id) {
 		return
 	}
 	if !attr.OverrideRedirect || attr.MapState == xgb.MapStateViewable {
-		setBorderColor(win, "pink")
-		setBorderWidth(win, 2)
+		setBorderColor(win, bcolor)
+		setBorderWidth(win, 1)
 		conn.MapWindow(win)
 
 	}
@@ -111,9 +110,6 @@ func shutdown() {
 	os.Exit(0)
 }
 
-func setupwin(win *xgb.Id) {
-	//cond.ConfigureWindow(win, xdb.ConfigureWindow:
-}
 
 func run() {
 	conn.MapWindow(root)
