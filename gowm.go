@@ -11,10 +11,9 @@ var (
 	conn       *xgb.Conn
 	screen     *xgb.ScreenInfo
 	root       xgb.Id
-	logger     = log.New(os.Stderr, "", log.Ldate|log.Ltime)
+	logger     = log.New(os.Stderr, "gowm: ", 0)
 	envdisplay = os.Getenv("DISPLAY")
 )
-
 
 func main() {
 	lprintf("starting")
@@ -22,7 +21,7 @@ func main() {
 	screen = conn.DefaultScreen()
 	root = screen.Root
 	registerEvents()
-	createTestWindow()
+	//createTestWindow()
 	checkWM()
 	setupScreen()
 	run()
@@ -40,7 +39,6 @@ func createTestWindow() {
 		})
 	conn.CreateGC(gc, win, xgb.GCForeground, []uint32{screen.WhitePixel})
 	conn.MapWindow(win)
-	setupWindow(win)
 }
 
 func setupScreen() {
@@ -64,12 +62,14 @@ func setupWindow(win xgb.Id) {
 	if !attr.OverrideRedirect || attr.MapState == xgb.MapStateViewable {
 		setBorderColor(win, bcolor)
 		setBorderWidth(win, 1)
+		setWidthHeight(win, uint32(screen.WidthInPixels)/2-2, uint32(screen.HeightInPixels)-2)
 		conn.MapWindow(win)
-
 	}
 }
 
-func getWmDestop() {
+func setWidthHeight(win xgb.Id, x uint32, y uint32) {
+	conn.ConfigureWindow(win, xgb.ConfigWindowWidth|xgb.ConfigWindowHeight, []uint32{x, y})
+	lprintf("screen dim %vx%v", screen.WidthInPixels, screen.HeightInPixels)
 }
 
 func connectToX() {
@@ -81,7 +81,6 @@ func connectToX() {
 	}
 	lprintf("connected to %v", envdisplay)
 }
-
 
 func registerEvents() {
 	conn.ChangeWindowAttributes(root, xgb.CWEventMask, []uint32{
@@ -103,20 +102,18 @@ func checkWM() {
 	}
 }
 
-
 func shutdown() {
 	lprintf("closing %v", envdisplay)
 	conn.Close()
 	os.Exit(0)
 }
 
-
 func run() {
 	conn.MapWindow(root)
 	for {
 		reply, err := conn.WaitForEvent()
 		if err != nil {
-			lfatalf("error : %v", err)
+			//lfatalf("error : %v", err)
 		}
 		lprintf("event %T", reply)
 		switch event := reply.(type) {
@@ -146,11 +143,11 @@ func setBorderColor(win xgb.Id, color string) {
 }
 
 func lprintf(format string, i ...interface{}) {
-	logger.Printf("gowm: "+format, i...)
+	logger.Printf(format, i...)
 }
 
 func lfatalf(format string, i ...interface{}) {
-	logger.Fatalf("gowm: error: "+format, i...)
+	logger.Fatalf("error: "+format, i...)
 }
 
 func getColorByName(color string) uint32 {
