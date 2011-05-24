@@ -12,7 +12,7 @@ CFLAGS += $(shell pkg-config --libs x11)
 
 include $(GOROOT)/src/Make.cmd
 
-test: format clean xcb all
+test: format clean all
 	./test
 
 format:
