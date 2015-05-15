@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 	"log"
-	"x-go-binding.googlecode.com/hg/xgb"
+	"code.google.com/p/x-go-binding/xgb"
 )
 
 var (
@@ -45,7 +45,7 @@ func setupScreen() {
 	qtr, err := conn.QueryTree(root)
 	//atom_desktop, _ := conn.InternAtom(true, "_NET_WM_DESKTOP")
 	if err != nil {
-		lfatalf(err.String())
+		lfatalf(err.Error())
 	}
 	for _, child := range qtr.Children {
 		lprintf("found window %v", child)
@@ -74,7 +74,7 @@ func setWidthHeight(win xgb.Id, x uint32, y uint32) {
 
 func connectToX() {
 	lprintf("connecting to %v", envdisplay)
-	var err os.Error
+	var err error
 	conn, err = xgb.Dial(envdisplay)
 	if err != nil {
 		lfatalf("%v", err)
